@@ -1,0 +1,25 @@
+# IBM Developer's Workframe/2 Make File Creation run at 21:49:53 on 04/20/93
+
+# Make File Creation run in directory:
+#   E:\CSOURCE\PMSW2;
+
+# Assumed INCLUDE environment variable path:
+#   G:\IBMC\INCLUDE;
+#   G:\TOOLKT20\C\OS2H;
+#   G:\TOOLKT20\ASM\OS2INC;
+
+
+PMSW2.INF:  PMSW2.IPF  \
+   MAKEFILE
+
+MSKCHK.OBJ:  MSKCHK.C  \
+#  {$(INCLUDE);}stddef.h  \
+#  {$(INCLUDE);}stdio.h  \
+   MAKEFILE
+
+PMSW2.OBJ:  PMSW2.C  \
+#  {$(INCLUDE);}stdio.h  \
+#  {$(INCLUDE);}OS2.H  \
+#  {$(INCLUDE);}rexxsaa.h  \
+   {.;$(INCLUDE);}pmsw2.h  \
+   MAKEFILE

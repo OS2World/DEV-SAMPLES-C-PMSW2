@@ -1,0 +1,486 @@
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     1
+                                      * * * * *   P R O L O G   * * * * *
+
+ Compiler . . . . . . . . . . . . : 10G2996/10G3293 IBM C Set/2 V1.0
+ Command options:
+    Program name. . . . . . . . . : E:\CSOURCE\PMSW2\MSKCHK.C
+    Object name . . . . . . . . . : MSKCHK.obj
+    Listing name. . . . . . . . . : MSKCHK.lst
+    Compiler options. . . . . . . : /C+  /Fa- /Fc- /Fd- /Fl+ /Fm- /Fo+ /Gd- /Ge- /Gf- /Gh- /Gm+ /Gn- /Gp- /Gr- /Gs- /Gt- /Gw- 
+                                  : /J+  /Ka- /Kb- /Kc- /Ke- /Kf- /Kg- /Ki- /Ko- /Kp- /Kr- /Kt- /Kx- /L+  /La+ /Le- /Lf- /Li- 
+                                  : /Lj- /Ls+ /Lx+ /O-  /P-  /Pc- /Pd- /Q-  /Sd- /Sh- /Sn- /Sr- /Ss- /Ti- /Ts- /Xi- 
+                                  : /Mp  /Re  /Se  /Sp4  /G3  /W3  /H255  /Lp60  /Sg-  /Sq-  /N  
+                                  : /I  
+                                  : /Lt PMSW2 Compilation
+                                  : /Lu 
+                                  : /B  
+                                  : /V  
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     2
+                                          * * * * *   S O U R C E   * * * * *
+
+ LINE  STMT                                                                                                       SEQNBR INCNO
+             *...+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9.......*
+    1       |/*============================================================================                    |      1           
+    2       |  旼컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴커                        |      2           
+    3       |  � MSKCHK.C   (C) Copyright 1992 Bruce E. H봥man.  All Rights Reserved. �                        |      3           
+    4       |  읕컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴켸                        |      4           
+    5       |  MSKCHK - Function to scan a given area for a match against a mask string                        |      5           
+    6       |  containing wild cards and constant characters.                                                  |      6           
+    7       |  This is an extension of the usual DOS wild-card filespec matching, as it                        |      7           
+    8       |  permits imbedded '*' and '?' and the mask is an arbitrary length.                               |      8           
+    9       |                                                                                                  |      9           
+   10       |  Input:  mask, mask_len, area, area_len, qmark, asterisk                                         |     10           
+   11       |          'qmark' is single-wild-card char, 'asterisk' is 0 to n wild chars.                      |     11           
+   12       |============================================================================*/                    |     12           
+   13       |#include <stddef.h>                                                                               |     13           
+   14       |#include <stdio.h>                                                                                |     14           
+   15       |#define ERROR  -1                                                                                 |     15           
+   16       |#define WARNING 4                                                                                 |     16           
+   17       |#define DONE   0x20 /* Whole mask is complete */                                                  |     17           
+   18       |#define MATCH  0x10 /* Whole mask is found/matched */                                             |     18           
+   19       |#define FAIL   0x08 /* Whole mask is not found */                                                 |     19           
+   20       |#define FLTFND 0x04 /* Mask float substr found */                                                 |     20           
+   21       |#ifndef FALSE                                                                                     |     21           
+   22       |#define FALSE  0                                                                                  |     22           
+   23       |#endif                                                                                            |     23           
+   24       |#ifndef TRUE                                                                                      |     24           
+   25       |#define TRUE  ~FALSE                                                                              |     25           
+   26       |#endif                                                                                            |     26           
+   27       |  unsigned long irc;                                                                              |     27           
+   28       |  unsigned long iflg;                                                                             |     28           
+   29       |  unsigned long iMaskOffset;                                                                      |     29           
+   30       |  unsigned long iAreaOffset;                                                                      |     30           
+   31       |  char *cMask;                                                                                    |     31           
+   32       |  unsigned long iMaskLen;                                                                         |     32           
+   33       |  char *cArea;                                                                                    |     33           
+   34       |  unsigned long iAreaLen;                                                                         |     34           
+   35       |  char *cQ;                                                                                       |     35           
+   36       |  char *cA;                                                                                       |     36           
+   37       |                                                                                                  |     37           
+   38       |/*=============                                                                                   |     38           
+   39       |  AString                                                                                         |     39           
+   40       |  Current mask character is "*" wild card.                                                        |     40           
+   41       |  (For "?" that appear after initial "*", process these.)                                         |     41           
+   42       |  We must scan mask string for its terminator.                                                    |     42           
+   43       |=============*/                                                                                   |     43           
+   44       |  static void AString (void)                                                                      |     44           
+   45       |{ unsigned long ixMaskOffset,      /* ptr '*' 2 in      *XXX* */                                  |     45           
+   46       |      iyMaskOffset;                                                                               |     46           
+   47       |  unsigned long ixAreaOffset, iyAreaOffset;                                                       |     47           
+   48       |  unsigned long iMatchCount, iwMaskLen;                                                           |     48           
+   49     1 |  while (TRUE)                     /* Process '*' and '?' at start */                             |     49           
+   50     2 |  { if (iflg & DONE) break;                                                                       |     50           
+   51       |                                                                                                  |     51           
+   52       |    if ((*cA != *(cMask+iMaskOffset))                                                             |     52           
+   53     4 |    &&  (*cQ != *(cMask+iMaskOffset))) break;                                                     |     53           
+   54       |                                                                                                  |     54           
+   55     6 |    while (*cA == *(cMask+iMaskOffset))                                                           |     55           
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     3
+                                          * * * * *   S O U R C E   * * * * *
+
+ LINE  STMT                                                                                                       SEQNBR INCNO
+             *...+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9.......*
+   56     7 |    { iMaskOffset++;                                                                              |     56           
+   57     8 |      if (iMaskOffset >= iMaskLen) { iflg |= DONE+MATCH; break;}                                  |     57           
+   58       |    }                                                                                             |     58           
+   59    11 |    while (*cQ == *(cMask+iMaskOffset))                                                           |     59           
+   60    12 |    { if (iAreaOffset >= iAreaLen) { iflg |= DONE+FAIL; break;}                                   |     60           
+   61    15 |      else iAreaOffset++;                                                                         |     61           
+   62    16 |      if ((++iMaskOffset >= iMaskLen) && (iAreaOffset >= iAreaLen))                               |     62           
+   63    17 |      { iflg |= DONE+MATCH; break;}                                                               |     63           
+   64       |    }                                                                                             |     64           
+   65       |  }                                                                                               |     65           
+   66    19 |  if (iflg & DONE) return;                                                                        |     66           
+   67       |                                                                                                  |     67           
+   68       |    /* Look for mask string terminator. */                                                        |     68           
+   69       |    /* if no  terminator:  mask ends:    '*' marks suffix */                                      |     69           
+   70       |    /* if '*' terminator:  mask float:   process floating mask */                                 |     70           
+   71       |                                                                                                  |     71           
+   72    21 |  ixMaskOffset=iMaskOffset;                                                                       |     72           
+   73    22 |  while (++ixMaskOffset < iMaskLen)                                                               |     73           
+   74    23 |  { if (*cA == *(cMask+ixMaskOffset)) break;}                                                     |     74           
+   75    25 |  if (ixMaskOffset >= iMaskLen)         /* Mask is suffix */                                      |     75           
+   76    26 |  { iyMaskOffset = ixMaskOffset-1;      /* ptr last char in mask */                               |     76           
+   77    27 |    iyAreaOffset = iAreaLen - 1;        /* ptr last char in area */                               |     77           
+   78    28 |    while (TRUE)                                                                                  |     78           
+   79    29 |    { if (iflg & DONE) break;                                                                     |     79           
+   80    31 |      if (iyMaskOffset < iMaskOffset) iflg |= DONE+MATCH;                                         |     80           
+   81       |      else                                                                                        |     81           
+   82    33 |      { if (iyAreaOffset < iAreaOffset) iflg |= DONE+FAIL;                                        |     82           
+   83       |        else                                                                                      |     83           
+   84    35 |        { if (*(cMask+iyMaskOffset) != *(cArea+iyAreaOffset))                                     |     84           
+   85    36 |          { if (*(cMask+iyMaskOffset) == *cQ)                                                     |     85           
+   86    37 |            {iyMaskOffset--; iyAreaOffset--;}                                                     |     86           
+   87    39 |            else iflg |= DONE+FAIL;                                                               |     87           
+   88       |          }                                                                                       |     88           
+   89       |        }                                                                                         |     89           
+   90       |      }                                                                                           |     90           
+   91    40 |      iyMaskOffset--; iyAreaOffset--;                                                             |     91           
+   92       |    }                                                                                             |     92           
+   93    42 |    goto AStringReturn;                 /* return from AString */                                 |     93           
+   94       |  }                                                                                               |     94           
+   95       |                                                                                                  |     95           
+   96       |  /* We have case of imbedded *xxx* mask string */                                                |     96           
+   97       |                                                                                                  |     97           
+   98    43 |  iwMaskLen=ixMaskOffset-iMaskOffset;   /* length of *xxx* string or zero */                      |     98           
+   99    44 |  ixAreaOffset=iAreaOffset;             /* save ptr area */                                       |     99           
+  100    45 |  iMatchCount=0;                        /* count of matched chars */                              |    100           
+  101    46 |  while (ixAreaOffset < iAreaLen)       /* stop at end of area if not sooner */                   |    101           
+  102    47 |  { if (iwMaskLen <= 0) break;          /* no-op loop if length is zero */                        |    102           
+  103    49 |    if (iMatchCount > 0) break;         /* stop loop if here and not zero */                      |    103           
+  104    51 |    iyAreaOffset = ixAreaOffset;                                                                  |    104           
+  105    52 |    iyMaskOffset = iMaskOffset;                                                                   |    105           
+  106    53 |    while (iyMaskOffset < ixMaskOffset)                                                           |    106           
+  107    54 |    { if (iMatchCount >= iwMaskLen) break; /* stop if matches >= mask length */                   |    107           
+  108    56 |      if (*(cMask+iyMaskOffset) == *(cArea+iyAreaOffset))                                         |    108           
+  109    57 |      { iyMaskOffset++; iyAreaOffset++; iMatchCount++; }                                          |    109           
+  110       |      else                                                                                        |    110           
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     4
+                                          * * * * *   S O U R C E   * * * * *
+
+ LINE  STMT                                                                                                       SEQNBR INCNO
+             *...+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9.......*
+  111    60 |      { if (*(cMask+iyMaskOffset) == *cQ)                                                         |    111           
+  112    61 |        { iMatchCount++; iyAreaOffset++; iyMaskOffset++; }                                        |    112           
+  113    64 |        else { iMatchCount = 0; break; }                                                          |    113           
+  114       |      }                                                                                           |    114           
+  115       |    }                                                                                             |    115           
+  116    66 |    if (iMatchCount < iwMaskLen) iMatchCount = 0;                                                 |    116           
+  117    68 |    ixAreaOffset++;                                                                               |    117           
+  118       |  }                                                                                               |    118           
+  119    69 |  if ((iMatchCount >= iwMaskLen) && (iwMaskLen > 0))                                              |    119           
+  120    70 |  { iflg |= FLTFND;                                                                               |    120           
+  121    71 |    iMaskOffset = ixMaskOffset; iAreaOffset = iyAreaOffset;                                       |    121           
+  122    73 |    if (iMaskOffset >= iMaskLen) iflg |= DONE+MATCH;                                              |    122           
+  123       |  }                                                                                               |    123           
+  124       |AStringReturn:                                                                                    |    124           
+  125    75 |  return;                                                                                         |    125           
+  126       |}                                                                                                 |    126           
+  127       |/*=============                                                                                   |    127           
+  128       |  PrefixString                                                                                    |    128           
+  129       |=============*/                                                                                   |    129           
+  130       |  static void PrefixString (void)                                                                 |    130           
+  131       |{ unsigned long ipMaskOffset;                                                                     |    131           
+  132    76 |  ipMaskOffset = iMaskOffset;                                                                     |    132           
+  133    77 |  while (++ipMaskOffset < iMaskLen)                                                               |    133           
+  134    78 |  { if (*cA == *(cMask+ipMaskOffset)) break;}                                                     |    134           
+  135    80 |  if (ipMaskOffset > iAreaLen) { iflg |= DONE+FAIL; return;}                                      |    135           
+  136    83 |  while (TRUE)                                                                                    |    136           
+  137    84 |  { if (iflg & DONE) break;                                                                       |    137           
+  138    86 |    if (*cA == *(cMask+iMaskOffset)) break;                                                       |    138           
+  139    88 |    if (iAreaOffset >= iAreaLen)                                                                  |    139           
+  140    89 |    { if (iMaskOffset >= iMaskLen) iflg |= DONE+MATCH; break;}                                    |    140           
+  141    92 |    if (iMaskOffset >= iMaskLen)                                                                  |    141           
+  142    93 |    { if (iAreaOffset >= iAreaLen) iflg |= DONE+MATCH;                                            |    142           
+  143    95 |      else iflg |= DONE+FAIL; break;                                                              |    143           
+  144       |    }                                                                                             |    144           
+  145    97 |    if (*(cMask+iMaskOffset) != *(cArea+iAreaOffset))                                             |    145           
+  146    98 |    { if (*cA != *(cMask+iMaskOffset))                                                            |    146           
+  147    99 |      { iflg |= DONE+FAIL; break;}                                                                |    147           
+  148       |    }                                                                                             |    148           
+  149   101 |    iMaskOffset++; iAreaOffset++;                                                                 |    149           
+  150       |  }                                                                                               |    150           
+  151   103 |  return;                                                                                         |    151           
+  152       |}                                                                                                 |    152           
+  153       |                                                                                                  |    153           
+  154       |                                                                                                  |    154           
+  155       |/*=============                                                                                   |    155           
+  156       |  mskchk                                                                                          |    156           
+  157       |=============*/                                                                                   |    157           
+  158       |                                                                                                  |    158           
+  159       |  unsigned long mskchk ( char *msk,     /* ptr mask string   */                                   |    159           
+  160       |                unsigned long msklen,   /* length of mask    */                                   |    160           
+  161       |               char *achk,              /* ptr area string   */                                   |    161           
+  162       |               unsigned long alen,      /* length of area    */                                   |    162           
+  163       |               char *q,                 /* ptr qmark char    */                                   |    163           
+  164       |               char *a )                /* ptr asterisk char */                                   |    164           
+  165       |                                                                                                  |    165           
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     5
+                                          * * * * *   S O U R C E   * * * * *
+
+ LINE  STMT                                                                                                       SEQNBR INCNO
+             *...+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9.......*
+  166   104 |{ cMask=msk; iMaskLen=msklen; cArea=achk; iAreaLen=alen; cQ=q; cA=a;                              |    166           
+  167   110 |  irc=0; iflg=0; iMaskOffset=0; iAreaOffset = 0;                                                  |    167           
+  168   114 |  if (msk==NULL||achk==NULL||q==NULL||a==NULL||msklen<=0||alen<=0)                                |    168           
+  169   115 |  { return ERROR;}                      /* Error if null argument(s) */                           |    169           
+  170       |                                                                                                  |    170           
+  171   116 |  while (*(cArea+iAreaOffset) == ' ')   /* Scan for 1st non-blank */                              |    171           
+  172   117 |  { iAreaOffset++; if (iAreaOffset >= iAreaLen) return WARNING;}                                  |    172           
+  173       |    /* Scan for last non-blank and non-null */                                                    |    173           
+  174   120 |  while (*(cArea+iAreaLen-1) == ' ' || *(cArea+iAreaLen-1) == '\0')                               |    174           
+  175   121 |  { iAreaLen--; if (iAreaLen <= iAreaOffset) return ERROR;}                                       |    175           
+  176       |                                                                                                  |    176           
+  177   124 |  while (!(iflg & DONE))                                                                          |    177           
+  178   125 |  { if (iMaskOffset >= iMaskLen) break;                                                           |    178           
+  179   127 |    while (*cQ == *(cMask+iMaskOffset)) /* while '?' in mask */                                   |    179           
+  180   128 |    { if (iflg & DONE) break;                                                                     |    180           
+  181   130 |      iMaskOffset++; iAreaOffset++;                                                               |    181           
+  182   132 |      if (iAreaOffset >= iAreaLen)          /* if area is exhausted */                            |    182           
+  183   133 |      { if (iMaskOffset >= iMaskLen)        /* and mask is exhausted */                           |    183           
+  184   134 |        { iflg |= DONE+MATCH;}               /* we're done and matched */                         |    184           
+  185       |        else                                                                                      |    185           
+  186   135 |        { if ((iMaskOffset+1>=iMaskLen) && (*cA == *(cMask+iMaskOffset+1)))                       |    186           
+  187   136 |          { iflg |= DONE+MATCH;}            /* if the last mask char is ast */                    |    187           
+  188       |          else                              /* we're matched */                                   |    188           
+  189   137 |          { iflg |= DONE+FAIL;}             /* otherwise failed */                                |    189           
+  190   138 |        } break;                                                                                  |    190           
+  191       |      }                                                                                           |    191           
+  192   139 |      if (iMaskOffset >= iMaskLen)                                                                |    192           
+  193   140 |      { iflg |= DONE;                                                                             |    193           
+  194   141 |        if (iAreaOffset < iAreaLen)                                                               |    194           
+  195   142 |        { if (*cQ == *(cMask+iMaskOffset-1)) iflg |= FAIL; }                                      |    195           
+  196   144 |        break;                                                                                    |    196           
+  197       |      }                                                                                           |    197           
+  198       |    }                                                                                             |    198           
+  199   145 |    if (iflg & DONE) break;                                                                       |    199           
+  200   147 |    if (*cA == *(cMask+iMaskOffset))    /* start of float str */                                  |    200           
+  201   148 |    { iMaskOffset++;                                                                              |    201           
+  202   149 |      if (iMaskOffset >= iMaskLen)          /* if mask is exhausted */                            |    202           
+  203   150 |      { iflg |= DONE;                                                                             |    203           
+  204   151 |        if (iAreaOffset < iAreaLen)         /* but area is not      */                            |    204           
+  205   152 |        { if (*cA==*(cMask+iMaskOffset-1))  /* but last mask char is asterisk */                  |    205           
+  206   153 |          { iflg |= MATCH;}                                                                       |    206           
+  207       |        }                                                                                         |    207           
+  208   154 |        else  iflg |= MATCH;           /* area is complete */                                     |    208           
+  209   155 |        break;                                                                                    |    209           
+  210       |      }                                                                                           |    210           
+  211   156 |      AString();                                                                                  |    211           
+  212       |    }                                                                                             |    212           
+  213   157 |    else PrefixString();                                                                          |    213           
+  214       |  }                                                                                               |    214           
+  215   158 |  if (iflg & FAIL) irc = 8;                                                                       |    215           
+  216   160 |  else irc = 0;                                                                                   |    216           
+  217       |  /* printf("MSKCHKRC=%i\n",irc); */                                                              |    217           
+  218   161 |  return irc;                                                                                     |    218           
+  219       |}                                                                                                 |    219           
+                                    * * * * *   E N D   O F   S O U R C E   * * * * *
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     6
+                        * * * * *   I N C L U D E S   * * * * *
+
+INCLUDE FILES  ---  FILE#   NAME
+                      1       G:\IBMC\INCLUDE\STDDEF.H
+                      2       G:\IBMC\INCLUDE\STDIO.H
+
+                        * * * * *   E N D   O F   I N C L U D E S   * * * * *
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     7
+                                * * * * *   C R O S S   R E F E R E N C E   L I S T I N G   * * * * *
+
+IDENTIFIER          DEFINITION      ATTRIBUTES
+                                    <SEQNBR>-<FILE NO>:<FILE LINE NO>
+
+AString             44-0:44         Class = static,                                                                               
+                                    Type =  _Optlink function returning void 
+                                    211-0:211 
+
+AStringReturn       93-0:93         label                                                                                         
+
+FILE                14-2:47         typedef                                                                                       
+                                    Type =  structure __file
+
+PrefixString        130-0:130       Class = static,                                                                               
+                                    Type =  _Optlink function returning void 
+                                    213-0:213 
+
+_OPERATIONS         14-2:30         Class = tag, Length = 1,                                                                      
+                                    Type =  enum 
+                                    14-2:45 
+
+__file              14-2:36         Class = tag, Type = structure                                                                 
+
+__fpos_t            14-2:50         Class = tag, Type = structure                                                                 
+
+__va_list           14-2:79         typedef                                                                                       
+                                    Type =  pointer to unsigned character 
+
+a                   164-0:164       Class = parameter, Length = 4,                                                                
+                                    Type =  pointer to unsigned character 
+                                    166-0:166, 168-0:168 
+
+achk                161-0:161       Class = parameter, Length = 4,                                                                
+                                    Type =  pointer to unsigned character 
+                                    166-0:166, 168-0:168 
+
+alen                162-0:162       Class = parameter, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    166-0:166, 168-0:168 
+
+cA                  36-0:36         Class = external definition, Length = 4,                                                      
+                                    Type =  pointer to unsigned character 
+
+cArea               33-0:33         Class = external definition, Length = 4,                                                      
+                                    Type =  pointer to unsigned character 
+
+cMask               31-0:31         Class = external definition, Length = 4,                                                      
+                                    Type =  pointer to unsigned character 
+
+cQ                  35-0:35         Class = external definition, Length = 4,                                                      
+                                    Type =  pointer to unsigned character 
+
+fpos_t              14-2:53         typedef                                                                                       
+                                    Type =  structure __fpos_t
+
+iAreaLen            34-0:34         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    60-0:60, 62-0:62, 77-0:77, 101-0:101, 135-0:135, 139-0:139, 142-0:142, 166-0:166,
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     8
+                                * * * * *   C R O S S   R E F E R E N C E   L I S T I N G   * * * * *
+
+IDENTIFIER          DEFINITION      ATTRIBUTES
+                                    <SEQNBR>-<FILE NO>:<FILE LINE NO>
+                                    172-0:172, 174-0:174, 174-0:174, 175-0:175, 175-0:175, 182-0:182, 194-0:194, 204-0:204 
+
+iAreaOffset         30-0:30         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    60-0:60, 61-0:61, 62-0:62, 82-0:82, 99-0:99, 121-0:121, 139-0:139, 142-0:142, 145-0:145,
+                                    149-0:149, 167-0:167, 171-0:171, 172-0:172, 172-0:172, 175-0:175, 181-0:181, 182-0:182,
+                                    194-0:194, 204-0:204 
+
+iMaskLen            32-0:32         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    57-0:57, 62-0:62, 73-0:73, 75-0:75, 122-0:122, 133-0:133, 140-0:140, 141-0:141, 166-0:166,
+                                    178-0:178, 183-0:183, 186-0:186, 192-0:192, 202-0:202 
+
+iMaskOffset         29-0:29         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    52-0:52, 53-0:53, 55-0:55, 56-0:56, 57-0:57, 59-0:59, 62-0:62, 72-0:72, 80-0:80,
+                                    98-0:98, 105-0:105, 121-0:121, 122-0:122, 132-0:132, 138-0:138, 140-0:140, 141-0:141,
+                                    145-0:145, 146-0:146, 149-0:149, 167-0:167, 178-0:178, 179-0:179, 181-0:181, 183-0:183,
+                                    186-0:186, 186-0:186, 192-0:192, 195-0:195, 200-0:200, 201-0:201, 202-0:202, 205-0:205 
+
+iMatchCount         48-0:48         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    100-0:100, 103-0:103, 107-0:107, 109-0:109, 112-0:112, 113-0:113, 116-0:116, 116-0:116,
+                                    119-0:119 
+
+iflg                28-0:28         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    50-0:50, 57-0:57, 60-0:60, 63-0:63, 66-0:66, 79-0:79, 80-0:80, 82-0:82, 87-0:87,
+                                    120-0:120, 122-0:122, 135-0:135, 137-0:137, 140-0:140, 142-0:142, 143-0:143, 147-0:147,
+                                    167-0:167, 177-0:177, 180-0:180, 184-0:184, 187-0:187, 189-0:189, 193-0:193, 195-0:195,
+                                    199-0:199, 203-0:203, 206-0:206, 208-0:208, 215-0:215 
+
+ipMaskOffset        131-0:131       Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    132-0:132, 133-0:133, 134-0:134, 135-0:135 
+
+irc                 27-0:27         Class = external definition, Length = 4,                                                      
+                                    Type =  unsigned long integer 
+                                    167-0:167, 215-0:215, 216-0:216, 218-0:218 
+
+iwMaskLen           48-0:48         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    98-0:98, 102-0:102, 107-0:107, 116-0:116, 119-0:119, 119-0:119 
+
+ixAreaOffset        47-0:47         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    99-0:99, 101-0:101, 104-0:104, 117-0:117 
+
+ixMaskOffset        45-0:45         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    72-0:72, 73-0:73, 74-0:74, 75-0:75, 76-0:76, 98-0:98, 106-0:106, 121-0:121 
+
+iyAreaOffset        47-0:47         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    77-0:77, 82-0:82, 84-0:84, 86-0:86, 91-0:91, 104-0:104, 108-0:108, 109-0:109, 112-0:112,
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page     9
+                                * * * * *   C R O S S   R E F E R E N C E   L I S T I N G   * * * * *
+
+IDENTIFIER          DEFINITION      ATTRIBUTES
+                                    <SEQNBR>-<FILE NO>:<FILE LINE NO>
+                                    121-0:121 
+
+iyMaskOffset        46-0:46         Class = automatic, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    76-0:76, 80-0:80, 84-0:84, 85-0:85, 86-0:86, 91-0:91, 105-0:105, 106-0:106, 108-0:108,
+                                    109-0:109, 111-0:111, 112-0:112 
+
+msk                 159-0:159       Class = parameter, Length = 4,                                                                
+                                    Type =  pointer to unsigned character 
+                                    166-0:166, 168-0:168 
+
+mskchk              159-0:159       Class = external definition,                                                                  
+                                    Type =  _Optlink function returning unsigned long integer 
+
+msklen              160-0:160       Class = parameter, Length = 4,                                                                
+                                    Type =  unsigned long integer 
+                                    166-0:166, 168-0:168 
+
+ptrdiff_t           13-1:25         typedef                                                                                       
+                                    Type =  signed integer 
+
+q                   163-0:163       Class = parameter, Length = 4,                                                                
+                                    Type =  pointer to unsigned character 
+                                    166-0:166, 168-0:168 
+
+size_t              13-1:29         typedef                                                                                       
+                                    Type =  unsigned integer 
+
+wchar_t             13-1:34         typedef                                                                                       
+                                    Type =  unsigned short integer 
+
+                         * * * * *   E N D   O F   C R O S S   R E F E R E N C E   L I S T I N G   * * * * *
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page    10
+                                  * * * * *   S T R U C T U R E   M A P S   * * * * *
+
+===================================================================================================================================
+| Aggregate map for: structure __file                                                           Total Size: 28 bytes              |
+|=================================================================================================================================|
+|      Offset       |      Length       | Member Name                                                                             |
+|    Bytes(Bits)    |    Bytes(Bits)    |                                                                                         |
+|===================|===================|=========================================================================================|
+|       0           |       4           |  bufPtr                                                                                 |
+|       4           |       4           |  count                                                                                  |
+|       8           |       4           |  userFlags                                                                              |
+|      12           |       4           |  bufLen                                                                                 |
+|      16           |       4           |  ungetCount                                                                             |
+|      20           |       4           |  tempStore                                                                              |
+|      24           |       2           |  ungetBuf[2]                                                                            |
+|      26           |       1           |  lastOp                                                                                 |
+|      27           |       1           |  filler                                                                                 |
+===================================================================================================================================
+
+===================================================================================================================================
+| Aggregate map for: _Packed structure __file                                                   Total Size: 28 bytes              |
+|=================================================================================================================================|
+|      Offset       |      Length       | Member Name                                                                             |
+|    Bytes(Bits)    |    Bytes(Bits)    |                                                                                         |
+|===================|===================|=========================================================================================|
+|       0           |       4           |  bufPtr                                                                                 |
+|       4           |       4           |  count                                                                                  |
+|       8           |       4           |  userFlags                                                                              |
+|      12           |       4           |  bufLen                                                                                 |
+|      16           |       4           |  ungetCount                                                                             |
+|      20           |       4           |  tempStore                                                                              |
+|      24           |       2           |  ungetBuf[2]                                                                            |
+|      26           |       1           |  lastOp                                                                                 |
+|      27           |       1           |  filler                                                                                 |
+===================================================================================================================================
+
+===================================================================================================================================
+| Aggregate map for: structure __fpos_t                                                         Total Size: 8 bytes               |
+|=================================================================================================================================|
+|      Offset       |      Length       | Member Name                                                                             |
+|    Bytes(Bits)    |    Bytes(Bits)    |                                                                                         |
+|===================|===================|=========================================================================================|
+|       0           |       8           |  __fpos_elem[2]                                                                         |
+===================================================================================================================================
+
+===================================================================================================================================
+| Aggregate map for: _Packed structure __fpos_t                                                 Total Size: 8 bytes               |
+|=================================================================================================================================|
+|      Offset       |      Length       | Member Name                                                                             |
+|    Bytes(Bits)    |    Bytes(Bits)    |                                                                                         |
+|===================|===================|=========================================================================================|
+|       0           |       8           |  __fpos_elem[2]                                                                         |
+===================================================================================================================================
+
+                           * * * * *   E N D   O F   S T R U C T U R E   M A P S   * * * * *
+PMSW2 Compilation                                                                              04/20/93 21:57:14     Page    11
+                             * * * * *   M E S S A G E   S U M M A R Y   * * * * *
+
+        Total            Informational(00)          Warning(10)          Error(30)            Severe Error(40)
+
+          0                    0                        0                   0                        0
+
+                        * * * * *   E N D   O F   M E S S A G E   S U M M A R Y   * * * * *

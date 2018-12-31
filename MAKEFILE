@@ -1,0 +1,36 @@
+# IBM Developer's Workframe/2 Make File Creation run at 21:49:53 on 04/20/93
+
+# Make File Creation run in directory:
+#   E:\CSOURCE\PMSW2;
+
+.SUFFIXES:
+
+.SUFFIXES: .c .ipf
+
+ALL: PMSW2.DLL \
+     PMSW2.INF
+
+PMSW2.DLL:  \
+  MSKCHK.OBJ \
+  PMSW2.OBJ \
+  PMSW2.DEF \
+  MAKEFILE
+   @REM @<<PMSW2.@0
+     /F /M /PACKD /W /SE:128 /ST:8192 /BAS:0x10000 +
+     MSKCHK.OBJ +
+     PMSW2.OBJ
+     PMSW2.DLL
+
+
+     PMSW2.DEF;
+<<
+   LINK386.EXE @PMSW2.@0
+  IMPLIB PMSW2.LIB PMSW2.DEF
+
+{.}.ipf.inf:
+   IPFC .\$*.IPF /INF
+
+{.}.c.obj:
+   ICC.EXE /Fl /Ls /Lx /La /Lp60 /Lt"PMSW2 Compilation" /Gm /Ge- /C .\$*.c
+
+!include MAKEFILE.DEP
